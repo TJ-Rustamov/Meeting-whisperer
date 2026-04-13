@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    --background: 280 20% 98%;
+    --foreground: 270 30% 12%;
+
+    --card: 280 25% 97%;
+    --card-foreground: 270 30% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 270 30% 12%;
+
+    --primary: 330 85% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 280 30% 94%;
+    --secondary-foreground: 270 30% 20%;
+
+    --muted: 280 15% 93%;
+    --muted-foreground: 270 10% 46%;
+
+    --accent: 290 60% 92%;
+    --accent-foreground: 280 40% 30%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 280 20% 90%;
+    --input: 280 20% 88%;
+    --ring: 330 85% 56%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 280 30% 99%;
+    --sidebar-foreground: 270 20% 30%;
+    --sidebar-primary: 330 85% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 290 40% 95%;
+    --sidebar-accent-foreground: 280 40% 30%;
+    --sidebar-border: 280 20% 92%;
+    --sidebar-ring: 330 85% 56%;
+
+    --meeting-active: 330 85% 56%;
+    --meeting-active-glow: 330 100% 70%;
+    --surface-elevated: 280 30% 99%;
+    --transcript-speaker-1: 330 80% 55%;
+    --transcript-speaker-2: 260 70% 60%;
+    --transcript-speaker-3: 200 70% 55%;
+  }
+
+  .dark {
+    --background: 270 30% 8%;
+    --foreground: 280 20% 95%;
+
+    --card: 270 25% 12%;
+    --card-foreground: 280 20% 95%;
+
+    --popover: 270 25% 12%;
+    --popover-foreground: 280 20% 95%;
+
+    --primary: 330 85% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 270 20% 18%;
+    --secondary-foreground: 280 20% 90%;
+
+    --muted: 270 15% 18%;
+    --muted-foreground: 280 10% 60%;
+
+    --accent: 290 30% 20%;
+    --accent-foreground: 290 40% 80%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 270 15% 20%;
+    --input: 270 15% 22%;
+    --ring: 330 85% 60%;
+
+    --sidebar-background: 270 30% 6%;
+    --sidebar-foreground: 280 15% 80%;
+    --sidebar-primary: 330 85% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 270 20% 15%;
+    --sidebar-accent-foreground: 290 30% 80%;
+    --sidebar-border: 270 15% 18%;
+    --sidebar-ring: 330 85% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer utilities {
+  .glow-primary {
+    box-shadow: 0 0 20px hsl(var(--meeting-active) / 0.4),
+                0 0 60px hsl(var(--meeting-active) / 0.15);
+  }
+
+  .pulse-recording {
+    animation: pulse-rec 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse-rec {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 999px;
+  }
+}

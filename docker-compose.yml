@@ -1,0 +1,69 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: meeting_whisperer_backend
+    environment:
+      APP_NAME: Meeting Whisperer API
+      DATABASE_URL: sqlite:////app/data/meetings.db
+      DATA_DIR: /app/data
+      AUDIO_DIR: /app/data/audio
+      WHISPER_MODEL_PATH: /models/faster-whisper-base.en
+      WHISPER_LANGUAGE: en
+      WHISPER_DEVICE: cpu
+      WHISPER_COMPUTE_TYPE: int8
+      WHISPER_BEAM_SIZE: 5
+      WHISPER_BEST_OF: 5
+      WHISPER_PATIENCE: 1.0
+      WHISPER_TEMPERATURE: 0.0
+      WHISPER_NO_SPEECH_THRESHOLD: 0.6
+      WHISPER_LOG_PROB_THRESHOLD: -1.0
+      WHISPER_INITIAL_PROMPT: ""
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      WS_SAMPLE_RATE: 16000
+      SILERO_THRESHOLD: 0.35
+      VAD_HANGOVER_FRAMES: 8
+      VAD_MIN_RMS_FLOOR: 80
+      VAD_QUIET_MULTIPLIER: 0.65
+      PARTIAL_INTERVAL_SEC: 1.2
+      SILENCE_FINALIZE_SEC: 1.0
+      LIVE_OVERLAP_SEC: 0.35
+      PARTIAL_MAX_AUDIO_SEC: 10.0
+      PARTIAL_MIN_NEW_AUDIO_SEC: 0.6
+      POSTPROCESS_BEAM_SIZE: 6
+      POSTPROCESS_BEST_OF: 6
+      POSTPROCESS_TEMPERATURE: 0.0
+      POSTPROCESS_USE_PYANNOTE: ${POSTPROCESS_USE_PYANNOTE:-1}
+      POSTPROCESS_PYANNOTE_MODEL: pyannote/speaker-diarization-3.1
+      POSTPROCESS_HF_TOKEN: ${POSTPROCESS_HF_TOKEN:-}
+      POSTPROCESS_ALLOW_SIMPLE_FALLBACK: ${POSTPROCESS_ALLOW_SIMPLE_FALLBACK:-0}
+      POSTPROCESS_FORCE_NUM_SPEAKERS: ${POSTPROCESS_FORCE_NUM_SPEAKERS:-0}
+      POSTPROCESS_RETRY_MULTI_SPEAKER: ${POSTPROCESS_RETRY_MULTI_SPEAKER:-1}
+      POSTPROCESS_RETRY_MIN_SPEAKERS: ${POSTPROCESS_RETRY_MIN_SPEAKERS:-2}
+      POSTPROCESS_RETRY_MAX_SPEAKERS: ${POSTPROCESS_RETRY_MAX_SPEAKERS:-8}
+      POSTPROCESS_RETRY_MIN_SEGMENTS: ${POSTPROCESS_RETRY_MIN_SEGMENTS:-6}
+      POSTPROCESS_SEGMENT_MAX_SEC: ${POSTPROCESS_SEGMENT_MAX_SEC:-8.0}
+      POSTPROCESS_SEGMENT_MAX_CHARS: ${POSTPROCESS_SEGMENT_MAX_CHARS:-180}
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_data:/app/data
+      - ./models:/models:ro
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    container_name: meeting_whisperer_frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  backend_data:
