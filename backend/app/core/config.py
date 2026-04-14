@@ -62,6 +62,7 @@ class Settings:
     postprocess_use_pyannote: bool = os.getenv("POSTPROCESS_USE_PYANNOTE", "1").lower() in {"1", "true", "yes"}
     postprocess_pyannote_model: str = os.getenv("POSTPROCESS_PYANNOTE_MODEL", "pyannote/speaker-diarization-3.1")
     postprocess_hf_token: str = os.getenv("POSTPROCESS_HF_TOKEN", "")
+    postprocess_diarization_timeout_sec: float = float(os.getenv("POSTPROCESS_DIARIZATION_TIMEOUT_SEC", "600"))
     postprocess_retry_multi_speaker: bool = os.getenv("POSTPROCESS_RETRY_MULTI_SPEAKER", "1").lower() in {
         "1",
         "true",

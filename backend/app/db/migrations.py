@@ -18,6 +18,8 @@ def ensure_meetings_schema(engine: Engine) -> None:
     columns = _existing_columns_sqlite(engine, "meetings")
     expected = {
         "processed_status": "TEXT NOT NULL DEFAULT 'idle'",
+        "processed_detail": "TEXT NULL",
+        "processed_progress_pct": "INTEGER NOT NULL DEFAULT 0",
         "processed_started_at": "DATETIME NULL",
         "processed_finished_at": "DATETIME NULL",
         "processed_error": "TEXT NULL",

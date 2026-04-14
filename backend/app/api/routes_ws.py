@@ -40,10 +40,10 @@ class StreamState:
     carryover_sec: float = 0.0
 
 
-async def _run_transcribe(audio: bytes) -> str:
+async def _run_transcribe(audio: bytes, boost_quality: bool = False) -> str:
     loop = asyncio.get_running_loop()
     transcriber = get_transcriber()
-    return await loop.run_in_executor(None, transcriber.transcribe_pcm16, audio)
+    return await loop.run_in_executor(None, lambda: transcriber.transcribe_pcm16(audio, boost_quality=boost_quality))
 
 
 async def _emit_json(websocket: WebSocket, event: str, data: dict):
@@ -80,7 +80,8 @@ async def _finalize_utterance(websocket: WebSocket, state: StreamState, db: Sess
         len(state.utterance_buffer),
         state.stream_time_sec,
     )
-    text = (await _run_transcribe(bytes(state.utterance_buffer))).strip()
+    boost_quality = state.source_label == "mic"
+    text = (await _run_transcribe(bytes(state.utterance_buffer), boost_quality=boost_quality)).strip()
     end_time = state.stream_time_sec
     start_time = state.utterance_start_sec
     volume_tag = volume_tag_from_rms(state.utterance_rms)
@@ -221,7 +222,8 @@ async def websocket_transcribe(websocket: WebSocket, meeting_id: int):
                             int(settings.partial_max_audio_sec * settings.ws_sample_rate * 2),
                         )
                         partial_audio = bytes(state.utterance_buffer[-max_partial_bytes:])
-                        partial_text = (await _run_transcribe(partial_audio)).strip()
+                        boost_quality = state.source_label == "mic"
+                        partial_text = (await _run_transcribe(partial_audio, boost_quality=boost_quality)).strip()
                         if partial_text:
                             if not await _safe_emit_json(
                                 websocket,

@@ -18,6 +18,8 @@ export interface Meeting {
   audioUrl?: string;
   videoUrl?: string;
   processedStatus: "idle" | "queued" | "running" | "done" | "failed";
+  processedDetail?: string;
+  processedProgressPct?: number;
   processedStartedAt?: string;
   processedFinishedAt?: string;
   processedError?: string;
@@ -249,6 +251,20 @@ export async function uploadMeetingVideo(id: string, videoBlob: Blob): Promise<M
 
 export async function triggerMeetingPostProcess(id: string): Promise<Meeting> {
   const payload = await api<ApiMeeting>(`/api/meetings/${id}/process`, {
+    method: "POST",
+  });
+  return mapMeeting(payload);
+}
+
+export async function restartMeetingPostProcess(id: string): Promise<Meeting> {
+  const payload = await api<ApiMeeting>(`/api/meetings/${id}/process/restart`, {
+    method: "POST",
+  });
+  return mapMeeting(payload);
+}
+
+export async function stopMeetingPostProcess(id: string): Promise<Meeting> {
+  const payload = await api<ApiMeeting>(`/api/meetings/${id}/process/stop`, {
     method: "POST",
   });
   return mapMeeting(payload);

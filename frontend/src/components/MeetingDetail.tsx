@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Pause, Play, Sparkles, Volume2 } from "lucide-react";
+import { ArrowLeft, Maximize2, Minimize2, Pause, Play, Sparkles, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
@@ -15,7 +15,9 @@ import {
   Meeting,
   ProcessedTranscriptEntry,
   formatTime,
+  restartMeetingPostProcess,
   triggerMeetingPostProcess,
+  stopMeetingPostProcess,
 } from "@/lib/meetingStore";
 import { buildSpeakerLabelMap, speakerBadgeColor, speakerLabelFor } from "@/lib/speakerLabels";
 import { toast } from "sonner";
@@ -38,7 +40,10 @@ export function MeetingDetail({ meeting, onBack, onUpdate }: MeetingDetailProps)
   const [processedTranscript, setProcessedTranscript] = useState<ProcessedTranscriptEntry[]>([]);
   const [isLoadingProcessed, setIsLoadingProcessed] = useState(false);
   const [isStartingProcess, setIsStartingProcess] = useState(false);
+  const [isRestartingProcess, setIsRestartingProcess] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [processedLoadError, setProcessedLoadError] = useState<string | null>(null);
+  const videoWrapperRef = useRef<HTMLDivElement | null>(null);
 
   const getPrimaryMedia = () => videoRef.current ?? audioRef.current;
   const hasPlayableMedia = Boolean(meeting.videoUrl || meeting.audioUrl);
@@ -109,7 +114,23 @@ export function MeetingDetail({ meeting, onBack, onUpdate }: MeetingDetailProps)
     setIsPlaying(false);
     setPlaybackPos(0);
     setMediaDuration(0);
+    setIsFullscreen(false);
   }, [meeting.id]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      const fullscreenElement = document.fullscreenElement;
+      setIsFullscreen(
+        Boolean(
+          fullscreenElement &&
+            (fullscreenElement === videoWrapperRef.current ||
+              videoWrapperRef.current?.contains(fullscreenElement))
+        )
+      );
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
 
   useEffect(() => {
     if (meeting.processedStatus !== "queued" && meeting.processedStatus !== "running") {
@@ -152,10 +173,46 @@ export function MeetingDetail({ meeting, onBack, onUpdate }: MeetingDetailProps)
     }
   };
 
+  const restartProcessing = async () => {
+    try {
+      setIsRestartingProcess(true);
+      await restartMeetingPostProcess(meeting.id);
+      await onUpdate();
+      toast.success("Processing restarted");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to restart processing");
+    } finally {
+      setIsRestartingProcess(false);
+    }
+  };
+
+  const stopProcessing = async () => {
+    try {
+      setIsRestartingProcess(true);
+      await stopMeetingPostProcess(meeting.id);
+      await onUpdate();
+      toast.success("Processing stopped");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to stop processing");
+    } finally {
+      setIsRestartingProcess(false);
+    }
+  };
+
+  const toggleFullscreen = async () => {
+    if (!videoWrapperRef.current) return;
+    if (document.fullscreenElement === videoWrapperRef.current) {
+      await document.exitFullscreen();
+      return;
+    }
+    await videoWrapperRef.current.requestFullscreen();
+  };
+
   const showToggle = meeting.processedStatus === "done" && meeting.hasProcessedTranscript;
-  const showProcessButton =
-    Boolean(meeting.audioUrl) &&
-    (meeting.processedStatus === "idle" || meeting.processedStatus === "failed");
+  const showProcessButton = Boolean(meeting.audioUrl) && meeting.processedStatus === "idle";
+  const showRestartButton = meeting.processedStatus !== "idle" && meeting.processedStatus !== "done";
   const activeTranscript = viewMode === "cleaned" ? processedTranscript : meeting.transcript;
   const speakerLabelMap = useMemo(
     () => buildSpeakerLabelMap(activeTranscript.map((entry) => entry.speaker)),
@@ -178,34 +235,152 @@ export function MeetingDetail({ meeting, onBack, onUpdate }: MeetingDetailProps)
 
       <div className="p-4 md:px-6 border-b border-border bg-card">
         {meeting.videoUrl && (
-          <div className="mb-4 rounded-xl border border-border/80 bg-background p-2">
-            <video
-              ref={videoRef}
-              src={meeting.videoUrl}
-              controls
-              playsInline
-              className="w-full rounded-lg max-h-[320px] bg-black/80"
-              onTimeUpdate={(e) => {
-                setPlaybackPos(e.currentTarget.currentTime);
-                syncDurationFromElement(e.currentTarget);
-              }}
-              onLoadedMetadata={(e) => {
-                const target = e.currentTarget;
-                target.volume = volume;
-                target.playbackRate = playbackRate;
-                syncDurationFromElement(target);
-              }}
-              onDurationChange={(e) => {
-                syncDurationFromElement(e.currentTarget);
-              }}
-              onPlay={() => setMediaPlaybackState(true)}
-              onPause={() => setMediaPlaybackState(false)}
-              onEnded={() => {
-                setMediaPlaybackState(false);
-                setPlaybackPos(0);
-              }}
-            />
-          </div>
+          <>
+            <div
+              ref={videoWrapperRef}
+              className={`mb-4 ${
+                isFullscreen
+                  ? "fixed inset-0 w-screen h-screen bg-black p-0 rounded-none border-none flex flex-col justify-between z-50"
+                  : "relative rounded-xl border border-border/80 bg-background p-2"
+              }`}
+            >
+              {!isFullscreen && (
+                <div className="absolute right-3 top-3 z-20">
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={toggleFullscreen}
+                    aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                  >
+                    {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  </Button>
+                </div>
+              )}
+              {isFullscreen && (
+                <div className="absolute right-4 top-4 z-50">
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={toggleFullscreen}
+                    aria-label="Exit fullscreen"
+                  >
+                    <Minimize2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              <div className={isFullscreen ? "flex-1 flex items-center justify-center" : ""}>
+                <video
+                  ref={videoRef}
+                  src={meeting.videoUrl}
+                  controls={isFullscreen}
+                  playsInline
+                  className={isFullscreen ? "w-full h-full object-contain" : "w-full rounded-lg max-h-[320px] bg-black/80"}
+                  onTimeUpdate={(e) => {
+                    setPlaybackPos(e.currentTarget.currentTime);
+                    syncDurationFromElement(e.currentTarget);
+                  }}
+                  onLoadedMetadata={(e) => {
+                    const target = e.currentTarget;
+                    target.volume = volume;
+                    target.playbackRate = playbackRate;
+                    syncDurationFromElement(target);
+                  }}
+                  onDurationChange={(e) => {
+                    syncDurationFromElement(e.currentTarget);
+                  }}
+                  onPlay={() => setMediaPlaybackState(true)}
+                  onPause={() => setMediaPlaybackState(false)}
+                  onEnded={() => {
+                    setMediaPlaybackState(false);
+                    setPlaybackPos(0);
+                  }}
+                />
+              </div>
+              {!isFullscreen && (
+                <div className="mt-2">
+                  <div className="rounded-full border border-border/80 bg-background/80 px-2 py-2 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 rounded-full"
+                        onClick={() => {
+                          void togglePlayback();
+                        }}
+                        disabled={!hasPlayableMedia}
+                      >
+                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      </Button>
+
+                      <div className="flex-1 px-1">
+                        <Slider
+                          min={0}
+                          max={Math.max(1, duration)}
+                          step={0.1}
+                          value={[Math.min(playbackPos, Math.max(1, duration))]}
+                          onValueChange={(values) => seekTo(values[0] ?? 0)}
+                          disabled={!hasPlayableMedia}
+                          aria-label="Seek video"
+                        />
+                      </div>
+
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 rounded-full"
+                            disabled={!hasPlayableMedia}
+                            aria-label="Volume"
+                          >
+                            <Volume2 className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-44 p-3">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>Volume</span>
+                              <span>{Math.round(volume * 100)}%</span>
+                            </div>
+                            <Slider
+                              min={0}
+                              max={1}
+                              step={0.01}
+                              value={[volume]}
+                              onValueChange={(values) => setAudioVolume(values[0] ?? 1)}
+                              disabled={!hasPlayableMedia}
+                              aria-label="Playback volume"
+                            />
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+
+                      <Select
+                        value={String(playbackRate)}
+                        onValueChange={(value) => setAudioRate(Number(value))}
+                        disabled={!hasPlayableMedia}
+                      >
+                        <SelectTrigger className="h-8 w-[78px] rounded-full border-border/80 bg-background px-3 text-xs">
+                          <SelectValue placeholder="1x" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0.5">0.5x</SelectItem>
+                          <SelectItem value="1">1x</SelectItem>
+                          <SelectItem value="2">2x</SelectItem>
+                          <SelectItem value="3">3x</SelectItem>
+                          <SelectItem value="4">4x</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground px-1">
+                    <span>{formatTime(playbackPos)}</span>
+                    <span>{formatTime(duration)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {!meeting.videoUrl && (
@@ -337,16 +512,56 @@ export function MeetingDetail({ meeting, onBack, onUpdate }: MeetingDetailProps)
 
       <div className="px-4 md:px-6 py-3 border-b border-border flex flex-wrap items-center gap-2">
         {showProcessButton && (
-          <Button onClick={startProcessing} size="sm" className="gap-2" disabled={isStartingProcess}>
+          <Button onClick={startProcessing} size="sm" className="gap-2" disabled={isStartingProcess || isRestartingProcess}>
             <Sparkles className="h-4 w-4" />
             {isStartingProcess ? "Starting..." : "Clean & Diarize"}
           </Button>
         )}
 
+        {showRestartButton && (
+          <Button
+            variant="outline"
+            onClick={restartProcessing}
+            size="sm"
+            className="gap-2"
+            disabled={isRestartingProcess || isStartingProcess}
+          >
+            {isRestartingProcess ? "Restarting..." : "Restart processing"}
+          </Button>
+        )}
+
         {(meeting.processedStatus === "queued" || meeting.processedStatus === "running") && (
-          <span className="text-sm text-muted-foreground">
-            {meeting.processedStatus === "queued" ? "Queued for processing..." : "Processing..."}
-          </span>
+          <div className="flex items-center gap-3 w-full">
+            <div className="flex flex-col gap-1 flex-1">
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 rounded-full border-2 border-transparent border-t-primary border-r-primary animate-spin" />
+                <span className="text-sm text-muted-foreground">
+                  {meeting.processedStatus === "queued" ? "Queued..." : (meeting.processedDetail || "Processing...")}
+                </span>
+                {meeting.processedProgressPct && (
+                  <span className="text-xs text-muted-foreground ml-auto">{meeting.processedProgressPct}%</span>
+                )}
+              </div>
+              {meeting.processedProgressPct && (
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{ width: `${Math.min(100, meeting.processedProgressPct)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={stopProcessing}
+              disabled={isRestartingProcess}
+              className="gap-2 text-destructive hover:text-destructive"
+            >
+              <X className="h-4 w-4" />
+              Stop
+            </Button>
+          </div>
         )}
 
         {meeting.processedStatus === "failed" && (

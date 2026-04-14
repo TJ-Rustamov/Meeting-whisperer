@@ -36,6 +36,8 @@ class MeetingOut(BaseModel):
     video_url: str | None = None
     summary_text: str | None = None
     processed_status: str = "idle"
+    processed_detail: str | None = None
+    processed_progress_pct: int = 0
     processed_started_at: datetime | None = None
     processed_finished_at: datetime | None = None
     processed_error: str | None = None

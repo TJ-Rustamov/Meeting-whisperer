@@ -21,6 +21,8 @@ class Meeting(Base):
     video_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     summary_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     processed_status: Mapped[str] = mapped_column(String(24), default="idle", nullable=False)
+    processed_detail: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    processed_progress_pct: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     processed_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     processed_finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     processed_error: Mapped[str | None] = mapped_column(Text, nullable=True)

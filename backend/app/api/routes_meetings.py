@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -11,7 +12,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.meeting import Meeting
 from app.schemas.meeting import MeetingCreate, MeetingOut, MeetingUpdate, ProcessedTranscriptOut, ProcessedTranscriptSegmentOut
-from app.services.postprocess import enqueue_postprocess
+from app.services.postprocess import enqueue_postprocess, reset_postprocess_job, cancel_postprocess_job
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 logger = logging.getLogger(__name__)
@@ -89,6 +90,48 @@ def trigger_meeting_postprocess(meeting_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Processing already in progress.")
     db.refresh(meeting)
     logger.info("Post-processing queued meeting_id=%s", meeting_id)
+    return meeting
+
+
+@router.post("/{meeting_id}/process/restart", response_model=MeetingOut)
+def restart_meeting_postprocess(meeting_id: int, db: Session = Depends(get_db)):
+    meeting = db.query(Meeting).options(selectinload(Meeting.processed_transcript_segments)).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    if not meeting.audio_file_path:
+        raise HTTPException(status_code=400, detail="Upload audio before processing.")
+
+    for segment in meeting.processed_transcript_segments:
+        db.delete(segment)
+    meeting.processed_status = "idle"
+    meeting.processed_started_at = None
+    meeting.processed_finished_at = None
+    meeting.processed_error = None
+    meeting.has_processed_transcript = False
+    db.commit()
+
+    reset_postprocess_job(meeting_id)
+    time.sleep(0.1)
+    
+    enqueued = enqueue_postprocess(meeting_id)
+    if not enqueued:
+        raise HTTPException(status_code=409, detail="Could not enqueue; another process may still be running.")
+    db.refresh(meeting)
+    logger.info("Post-processing restarted meeting_id=%s", meeting_id)
+    return meeting
+
+
+@router.post("/{meeting_id}/process/stop", response_model=MeetingOut)
+def stop_meeting_postprocess(meeting_id: int, db: Session = Depends(get_db)):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    if meeting.processed_status not in {"queued", "running"}:
+        raise HTTPException(status_code=409, detail="No processing in progress.")
+    
+    cancelled = cancel_postprocess_job(meeting_id)
+    db.refresh(meeting)
+    logger.info("Post-processing stop requested meeting_id=%s cancelled=%s", meeting_id, cancelled)
     return meeting
 
 
