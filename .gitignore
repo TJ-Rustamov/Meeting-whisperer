@@ -30,6 +30,9 @@ dist/
 dist-installer/
 frontend_dist/
 runtime-logs/
+launcher/build/
+launcher/dist/
+launcher/output/
 
 # Local runtime data
 data/
@@ -46,7 +49,7 @@ packaging/prereqs/
 # Model repos and heavy weights
 models/**/.git/
 models/**/.gitattributes
-models/**/model.bin
+
 models/**/kokoro-v1_0.pth
 models/stt/
 models/tts/
